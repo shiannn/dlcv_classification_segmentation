@@ -3,7 +3,7 @@ import math
 import torch
 from config_p1 import EPOCH, TRAIN_ROOT, VAL_ROOT, BATCH_SIZE, NUM_WORKERS, DEVICE, SAVE_DIR
 from dataset_p1 import ClassificationDataset, get_train_transform, get_valid_transform
-from model_p1 import model, criterion, optimizer, lr_scheduler
+from model_p1 import models, criterion, optimizers, lr_schedulers, names
 
 def training(model):
     train_transform = get_train_transform()
@@ -18,8 +18,9 @@ def training(model):
         valid_dataset, batch_size=BATCH_SIZE,
         shuffle=False, num_workers=NUM_WORKERS
     )
-    model = model.to(DEVICE)
-    best_acc = -1.0
+    for model in models:
+        model = model.to(DEVICE)
+    best_accs = [-1.0 for _ in models]
     for epoch in range(EPOCH):
         for phase in ['train', 'val']:
             if phase == 'train':
@@ -31,37 +32,60 @@ def training(model):
                 model.eval()
                 loader = valid_loader
             
-            running_loss = 0.0
-            running_corrects = 0
+            running_losses = [0.0 for _ in models]
+            running_correctses = [0 for _ in models]
+            outputs = [None for _ in models]
+            ensemble_loss = 0.0
+            ensemble_corrects = 0
             for idx, batch_data in enumerate(loader):
                 batch_imgs, batch_labels = batch_data
                 batch_imgs = batch_imgs.to(DEVICE)
                 batch_labels = batch_labels.to(DEVICE)
-                optimizer.zero_grad()
-                with torch.set_grad_enabled(phase == 'train'):
-                    outputs = model(batch_imgs)
-                    _, preds = torch.max(outputs, 1)
-                    loss = criterion(outputs, batch_labels)
-                    if phase == 'train':
-                        loss.backward()
-                        optimizer.step()
+                for idx, (optimizer, model) in enumerate(zip(optimizers, models)):
+                    optimizer.zero_grad()
+                    with torch.set_grad_enabled(phase == 'train'):
+                        outputs[idx] = model(batch_imgs)
+                        _, preds = torch.max(outputs[idx], 1)
+                        loss = criterion(outputs[idx], batch_labels)
+                        if phase == 'train':
+                            loss.backward()
+                            optimizer.step()
                 
-                running_loss += loss.item()* batch_imgs.shape[0]
-                running_corrects += torch.sum(preds==batch_labels)
+                    running_losses[idx] += loss.item()* batch_imgs.shape[0]
+                    running_correctses[idx] += torch.sum(preds==batch_labels)
+                ### calculate ensemble loss
+                ensemble_outputs = torch.stack(outputs, dim=0)
+                ensemble_outputs = ensemble_outputs.mean(dim=0)
+                _, ensemble_preds = torch.max(ensemble_outputs, 1)
+                temp_loss = criterion(ensemble_outputs, batch_labels)
+                ensemble_loss += temp_loss.item()* batch_imgs.shape[0]
+                ensemble_corrects += torch.sum(ensemble_preds==batch_labels)
+
             if phase == 'train':
-                lr_scheduler.step()
+                for lr_scheduler in lr_schedulers:
+                    lr_scheduler.step()
             ### print loss for train & validation
+            for idx, (name, running_loss, running_corrects) in enumerate(zip(
+                names, running_losses, running_correctses)):
+                if phase == 'train':
+                    epoch_loss = running_loss / len(train_dataset)
+                    epoch_acc = running_corrects.double() / len(train_dataset)
+                else:
+                    epoch_loss = running_loss / len(valid_dataset)
+                    epoch_acc = running_corrects.double() / len(valid_dataset)
+                print('{} {} Loss: {:.4f} Acc: {:.4f}'.format(phase, name, epoch_loss, epoch_acc))
+                if phase == 'val' and epoch_acc > best_accs[idx]:
+                    best_accs[idx] = epoch_acc
+                    name_acc = str(math.floor(100*best_accs[idx]))
+                    torch.save(model.state_dict(), os.path.join(SAVE_DIR, name+name_acc+'.pkl'))
             if phase == 'train':
-                epoch_loss = running_loss / len(train_dataset)
-                epoch_acc = running_corrects.double() / len(train_dataset)
+                print('{} Loss: {:.4f} Acc: {:.4f}'.format(
+                    phase, ensemble_loss/len(train_dataset), ensemble_corrects.double()/len(train_dataset))
+                )
             else:
-                epoch_loss = running_loss / len(valid_dataset)
-                epoch_acc = running_corrects.double() / len(valid_dataset)
-            print('{} Loss: {:.4f} Acc: {:.4f}'.format(phase, epoch_loss, epoch_acc))
-            if phase == 'val' and epoch_acc > best_acc:
-                best_acc = epoch_acc
-                name_acc = str(math.floor(100*best_acc))
-                torch.save(model.state_dict(), os.path.join(SAVE_DIR, 'vgg16_'+name_acc+'.pkl'))
+                print('{} Loss: {:.4f} Acc: {:.4f}'.format(
+                    phase, ensemble_loss/len(valid_dataset), ensemble_corrects.double()/len(valid_dataset))
+                )
 
 if __name__ == '__main__':
-    training(model)
+    training(models)
