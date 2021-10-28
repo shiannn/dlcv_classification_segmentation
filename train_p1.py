@@ -5,7 +5,7 @@ from config_p1 import EPOCH, TRAIN_ROOT, VAL_ROOT, BATCH_SIZE, NUM_WORKERS, DEVI
 from dataset_p1 import ClassificationDataset, get_train_transform, get_valid_transform
 from model_p1 import models, criterion, optimizers, lr_schedulers, names
 
-def training(model):
+def training():
     train_transform = get_train_transform()
     train_dataset = ClassificationDataset(TRAIN_ROOT, transform=train_transform)
     train_loader = torch.utils.data.DataLoader(
@@ -18,18 +18,20 @@ def training(model):
         valid_dataset, batch_size=BATCH_SIZE,
         shuffle=False, num_workers=NUM_WORKERS
     )
-    for model in models:
-        model = model.to(DEVICE)
+    for idx in range(len(models)):
+        models[idx] = models[idx].to(DEVICE)
     best_accs = [-1.0 for _ in models]
     for epoch in range(EPOCH):
         for phase in ['train', 'val']:
             if phase == 'train':
                 print('[train]')
-                model.train()
+                for idx in range(len(models)):
+                    models[idx].train()
                 loader = train_loader
             else:
                 print('[valid]')
-                model.eval()
+                for idx in range(len(models)):
+                    models[idx].eval()
                 loader = valid_loader
             
             running_losses = [0.0 for _ in models]
@@ -77,7 +79,7 @@ def training(model):
                 if phase == 'val' and epoch_acc > best_accs[idx]:
                     best_accs[idx] = epoch_acc
                     name_acc = str(math.floor(100*best_accs[idx]))
-                    torch.save(model.state_dict(), os.path.join(SAVE_DIR, name+name_acc+'.pkl'))
+                    torch.save(models[idx].state_dict(), os.path.join(SAVE_DIR, name+name_acc+'.pkl'))
             if phase == 'train':
                 print('{} Loss: {:.4f} Acc: {:.4f}'.format(
                     phase, ensemble_loss/len(train_dataset), ensemble_corrects.double()/len(train_dataset))
@@ -88,4 +90,4 @@ def training(model):
                 )
 
 if __name__ == '__main__':
-    training(models)
+    training()

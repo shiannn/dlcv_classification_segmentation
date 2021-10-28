@@ -8,11 +8,13 @@ models = [
     #torchvision.models.vgg16(pretrained=True),
     #torchvision.models.resnet18(pretrained=True),
     #torchvision.models.vgg16_bn(pretrained=True),
-    #torchvision.models.resnet34(pretrained=True),
-    torchvision.models.vgg19_bn(pretrained=True),
+    #torchvision.models.vgg19_bn(pretrained=True),
+    torchvision.models.resnet34(pretrained=True),
     torchvision.models.resnet50(pretrained=True),
+    #torchvision.models.vgg13(pretrained=True),
+    #torchvision.models.vgg19(pretrained=True),
 ]
-names = ['vgg19_bn', 'resnet50_']
+names = ['resnet34_', 'resnet50_']
 
 criterion = torch.nn.CrossEntropyLoss()
 optimizers = [

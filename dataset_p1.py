@@ -30,7 +30,8 @@ class ClassificationDataset(Dataset):
 
 def get_train_transform(jitter_param=0.4):
     transform = transforms.Compose([
-        transforms.RandomCrop(size=32, padding=4),
+        #transforms.RandomCrop(size=32, padding=4),
+        transforms.RandomRotation(degrees=15),
         transforms.RandomHorizontalFlip(),
         transforms.ColorJitter(
             brightness=jitter_param,

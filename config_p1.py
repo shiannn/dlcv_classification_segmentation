@@ -12,7 +12,7 @@ os.makedirs(SAVE_DIR, exist_ok=True)
 
 #print(TRAIN_ROOT, VAL_ROOT)
 #print(os.listdir(VAL_ROOT))
-EPOCH = 20
+EPOCH = 40
 BATCH_SIZE = 32
 NUM_WORKERS = 4
 LR = 0.001
