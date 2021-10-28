@@ -44,6 +44,15 @@ def get_train_transform(jitter_param=0.4):
     ])
     return transform
 
+def get_valid_transform():
+    transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize(
+            (0.5, 0.5, 0.5), (0.5, 0.5, 0.5)
+        )
+    ])
+    return transform
+
 if __name__ == '__main__':
     train_transform = get_train_transform()
     classificationDataset = ClassificationDataset(TRAIN_ROOT, transform=train_transform)
