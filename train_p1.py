@@ -4,10 +4,16 @@ import torch
 from config_p1 import EPOCH, TRAIN_ROOT, VAL_ROOT, BATCH_SIZE, NUM_WORKERS, DEVICE, SAVE_DIR
 from dataset_p1 import ClassificationDataset, get_train_transform, get_valid_transform
 from model_p1 import models, criterion, optimizers, lr_schedulers, names
+from timm.data.auto_augment import rand_augment_transform
 
 def training():
-    train_transform = get_train_transform()
-    train_dataset = ClassificationDataset(TRAIN_ROOT, transform=train_transform)
+    #train_transform = get_train_transform()
+    tfm = rand_augment_transform(
+        config_str='rand-m9-mstd0.5',
+        hparams={'translate_const': 117, 'img_mean': (124, 116, 104)}
+    )
+    second_transform = get_train_transform()
+    train_dataset = ClassificationDataset(TRAIN_ROOT, transform=tfm, second_transform=second_transform)
     train_loader = torch.utils.data.DataLoader(
         train_dataset, batch_size=BATCH_SIZE,
         shuffle=True, num_workers=NUM_WORKERS
@@ -20,7 +26,7 @@ def training():
     )
     for idx in range(len(models)):
         models[idx] = models[idx].to(DEVICE)
-    best_accs = [-1.0 for _ in models]
+    best_accs = [0.72 for _ in models]
     for epoch in range(EPOCH):
         for phase in ['train', 'val']:
             if phase == 'train':

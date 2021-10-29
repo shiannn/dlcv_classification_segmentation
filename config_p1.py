@@ -12,7 +12,7 @@ os.makedirs(SAVE_DIR, exist_ok=True)
 
 #print(TRAIN_ROOT, VAL_ROOT)
 #print(os.listdir(VAL_ROOT))
-EPOCH = 40
+EPOCH = 100
 BATCH_SIZE = 32
 NUM_WORKERS = 4
 LR = 0.001
@@ -20,5 +20,5 @@ MOMENTUM = 0.9
 
 SCHEDULER_STEPSIZE = 7
 SCHEDULER_GAMMA = 0.1
-os.environ['CUDA_VISIBLE_DEVICES'] = '6'
+os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
