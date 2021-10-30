@@ -25,10 +25,10 @@ class SegmentationWithFCN32(torch.nn.Module):
         fconn = self.fcnn(feats)
         #print(fconn.shape)
         score = self.score(fconn)
-        #return F.interpolate(score, x.shape[2:])
+        return F.interpolate(score, x.shape[2:])
         #print(score.shape)
-        return self.convTranspose(score)
-
+        #return self.convTranspose(score)
+"""
 def get_criterion():
     criterion = torch.nn.CrossEntropyLoss()
     return criterion
@@ -40,7 +40,7 @@ def get_scheduler(optimizer):
         optimizer,base_lr=LR,max_lr=1e-2,step_size_up=2000
     )
     return scheduler
-
+"""
 if __name__ == '__main__':
     vgg16 = torchvision.models.vgg16(pretrained=True)
     segmentationWithFCN32 = SegmentationWithFCN32(backbone=vgg16.features)

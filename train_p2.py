@@ -1,13 +1,13 @@
 import torch
 import torchvision
 import numpy as np
-from config_p2 import TRAIN_ROOT, VAL_ROOT, BATCH_SIZE, EPOCH, NUM_WORKERS, DEVICE, NUM_CLASSES
+from config_p2 import TRAIN_ROOT, VAL_ROOT, BATCH_SIZE, EPOCH, NUM_WORKERS, DEVICE, NUM_CLASSES, LR, MOMENTUM
 from dataset_p2 import (
     get_train_common_transform, get_train_transform, get_train_target_transform, 
     get_valid_common_transform, get_valid_transform, get_valid_target_transform,
     SegmentationDataset, onehot2maskclass
 )
-from model_p2 import SegmentationWithFCN32, get_criterion, get_optimizer, get_scheduler
+from model_p2 import SegmentationWithFCN32#, get_criterion, get_optimizer, get_scheduler
 from mean_iou_evaluate import mean_iou_score
 
 def training():
@@ -41,9 +41,16 @@ def training():
     vgg16 = torchvision.models.vgg16(pretrained=True)
     segmentationWithFCN32 = SegmentationWithFCN32(backbone=vgg16.features, num_classes=NUM_CLASSES)
     segmentationWithFCN32 = segmentationWithFCN32.to(DEVICE)
+    """
     criterion = get_criterion()
     optimizer = get_optimizer(segmentationWithFCN32)
     lr_scheduler = get_scheduler(optimizer)
+    """
+    criterion = torch.nn.CrossEntropyLoss()
+    optimizer = torch.optim.SGD(segmentationWithFCN32.parameters(), lr=LR, momentum=MOMENTUM)
+    lr_scheduler = torch.optim.lr_scheduler.CyclicLR(
+        optimizer,base_lr=LR,max_lr=1e-2,step_size_up=2000
+    )
     for epoch in range(EPOCH):
         for phase in ['train', 'val']:
             if phase == 'train':
