@@ -3,6 +3,7 @@ import torch
 from config_p2 import TRAIN_ROOT, VAL_ROOT, IMAGE_SIZE, DEVICE
 from torch.utils.data import Dataset, DataLoader
 from PIL import Image
+import torchvision
 import torchvision.transforms as transforms
 
 class SegmentationDataset(Dataset):
@@ -36,8 +37,9 @@ class SegmentationDataset(Dataset):
         img = Image.open(img_path).convert('RGB')
         mask = Image.open(mask_path).convert('RGB')
         if self.common_transform is not None:
-            img = self.common_transform(img)
-            mask = self.common_transform(mask)
+            #img = self.common_transform(img)
+            #mask = self.common_transform(mask)
+            img, mask = self.common_transform(img, mask)
         if self.transform is not None:
             img = self.transform(img)
         ### for other methods
@@ -51,6 +53,7 @@ class SegmentationDataset(Dataset):
         return len(self.datas)
 
 def get_train_common_transform():
+    """
     transform = transforms.Compose([
         #transforms.RandomCrop(size=32, padding=4),
         transforms.Resize(size=IMAGE_SIZE),
@@ -58,6 +61,23 @@ def get_train_common_transform():
         transforms.RandomHorizontalFlip(),
     ])
     return transform
+    """
+    def common_transform(img, mask, degree=15):
+        img = torchvision.transforms.functional.resize(img, size=IMAGE_SIZE)
+        mask = torchvision.transforms.functional.resize(mask, size=IMAGE_SIZE)
+        ### random rotate
+        rotate_rand = (-1)* degree + 2*degree* torch.rand(size=(1,))
+        #print('rotate_rand', rotate_rand.item())
+        img = torchvision.transforms.functional.rotate(img, angle=rotate_rand)
+        mask = torchvision.transforms.functional.rotate(mask, angle=rotate_rand)
+        ### random hflip
+        flip_rand = torch.rand(size=(1,))
+        #print('flip_rand', flip_rand.item())
+        if flip_rand.item() > 0.5:
+            img = torchvision.transforms.functional.hflip(img)
+            mask = torchvision.transforms.functional.hflip(mask)
+        return img, mask
+    return common_transform
 
 def get_train_transform(jitter_param=0.4):
     transform = transforms.Compose([
@@ -129,10 +149,17 @@ def my_mean_iou_score(pred, labels):
     return mean_iou
 """
 def get_valid_common_transform():
+    """
     transform = transforms.Compose([
         transforms.Resize(size=IMAGE_SIZE),
     ])
     return transform
+    """
+    def common_transform(img, mask, degree=15):
+        img = torchvision.transforms.functional.resize(img, size=IMAGE_SIZE)
+        mask = torchvision.transforms.functional.resize(mask, size=IMAGE_SIZE)
+        return img, mask
+    return common_transform
 
 def get_valid_transform(jitter_param=0.4):
     transform = transforms.Compose([
@@ -160,6 +187,6 @@ if __name__ == '__main__':
         target_transform=train_target_transform
     )
     img, mask = segmentationDataset[57]
-    print(mask[:,345,450])
+    #print(mask[:,345,450])
     labels = 4*mask[2,:,:]+2*mask[1,:,:]+1*mask[0,:,:]
     print(labels)
