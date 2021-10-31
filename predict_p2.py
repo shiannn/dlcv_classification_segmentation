@@ -4,12 +4,13 @@ import torch.nn.functional as F
 import argparse
 import torchvision
 import numpy as np
+from PIL import Image
 from model_p2 import SegmentationWithFCN32
 from model_p2_fcn16 import SegmentationWithFCN16
 from config_p2 import BATCH_SIZE, NUM_WORKERS, DEVICE, NUM_CLASSES, SAVE_DIR
 from dataset_p2 import (
     get_valid_common_transform, get_valid_transform, get_valid_target_transform,
-    SegmentationDataset#, onehot2maskclass
+    SegmentationDataset, maskclass2onehot
 )
 from mean_iou_evaluate import mean_iou_score
 
@@ -88,12 +89,27 @@ def predicting(args):
             
             preds = resized_pred.cpu().numpy() if preds is None else np.concatenate((preds, resized_pred.cpu().numpy()), axis=0)
             labels = resized_class_masks.cpu().numpy() if labels is None else np.concatenate((labels, resized_class_masks.cpu().numpy()), axis=0)
+        ### preds, labels are IMAGE_NUM,1,224,224
         preds = np.squeeze(preds)
         labels = np.squeeze(labels)
+        ret_onehot = maskclass2onehot(preds)
+        ### ret_onehot are [IMAGE_NUM, 512, 512, 3]
+        for i in range(ret_onehot.shape[0]):
+            source_path, _ = valid_dataset.datas[i]
+            save_name = os.path.basename(source_path)
+            save_path = os.path.join(args.output_path, save_name)
+            print(save_path)
+            img_tosave = Image.fromarray(np.uint8(255* ret_onehot[i]))
+            img_tosave.save(os.path.join(args.output_path, save_name))
+            
+        """
+        np.save('mock_preds.npy', preds)
+        np.save('mock_labels.npy', labels)
         print(preds.shape, labels.shape)
         
         mean_iou = mean_iou_score(preds, labels)
         print('Mean_IOU: {:.4f}'.format(mean_iou))
+        """
 
 if __name__ == '__main__':
     args = parse_args()

@@ -1,5 +1,6 @@
 import os
 import torch
+import numpy as np
 from config_p2 import TRAIN_ROOT, VAL_ROOT, IMAGE_SIZE, DEVICE
 from torch.utils.data import Dataset, DataLoader
 from PIL import Image
@@ -122,6 +123,30 @@ def onehot2maskclass(batch_masks):
     class_masks_copy[class_masks == 0] = 6  # (Black: 000) Unknown 
     class_masks_copy = class_masks_copy.long()
     return class_masks_copy
+
+def maskclass2onehot(batch_class):
+    ### batch_class [IMAGE_NUM, 512, 512]
+    ### first turn back the labels
+    batch_class_copy = np.zeros_like(batch_class)
+    batch_class_copy[batch_class==0] = 3
+    batch_class_copy[batch_class==1] = 6
+    batch_class_copy[batch_class==2] = 5
+    batch_class_copy[batch_class==3] = 2
+    batch_class_copy[batch_class==4] = 1
+    batch_class_copy[batch_class==5] = 7
+    batch_class_copy[batch_class==6] = 0
+    print(batch_class_copy.shape)
+    ret_onehot = np.zeros(
+        (batch_class_copy.shape[0], batch_class_copy.shape[1], batch_class_copy.shape[2], 3)
+    )
+    ### turn into one-hot
+    ret_onehot[:,:,:,0] = batch_class_copy
+    ret_onehot[:,:,:,2] = ret_onehot[:,:,:,0] % 2
+    ret_onehot[:,:,:,1] = (ret_onehot[:,:,:,0] // 2) % 2
+    ret_onehot[:,:,:,0] = (ret_onehot[:,:,:,0] // 4) % 2
+    #ret_onehot[1] = ret_onehot[1] % 2
+    #ret_onehot = np.transpose(ret_onehot, (1,2,3,0))
+    return ret_onehot
 """
 def my_mean_iou_score(pred, labels):
     ### pred [32, 244, 244], labels [32, 244, 244] should be tensors
@@ -183,6 +208,24 @@ def get_valid_target_transform():
     return transform
 
 if __name__ == '__main__':
+    mock_preds = np.load('mock_preds.npy')
+    onehot_mask = maskclass2onehot(mock_preds)
+    print(onehot_mask.shape)
+    print(onehot_mask.max())
+    print(onehot_mask.min())
+    """
+    print(mock_preds[0,0,0])
+    print(onehot_mask[0,0,0,:])
+    print(mock_preds[10,20,30])
+    print(onehot_mask[10,20,30,:])
+    print(mock_preds[70,50,80])
+    print(onehot_mask[70,50,80,:])
+    print(mock_preds[15,97,69])
+    print(onehot_mask[15,97,69,:])
+    print(mock_preds[127,55,45])
+    print(onehot_mask[127,55,45,:])
+    """
+    """
     train_common_transform = get_train_common_transform()
     train_transform = get_train_transform(jitter_param=0.4)
     train_target_transform = get_train_target_transform()
@@ -217,3 +260,4 @@ if __name__ == '__main__':
     print(ratio)
     adjust_ratio = [r / min(ratio) for r in ratio]
     print(adjust_ratio)
+    """
