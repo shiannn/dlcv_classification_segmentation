@@ -1,16 +1,29 @@
+import os
+import math
 import torch
 import torchvision
 import numpy as np
-from config_p2 import TRAIN_ROOT, VAL_ROOT, BATCH_SIZE, EPOCH, NUM_WORKERS, DEVICE, NUM_CLASSES, LR, MOMENTUM
+from config_p2 import TRAIN_ROOT, VAL_ROOT, BATCH_SIZE, EPOCH, NUM_WORKERS, DEVICE, NUM_CLASSES, LR, MOMENTUM, WEIGHT, SAVE_DIR, MAX_MODEL_NUM
 from dataset_p2 import (
     get_train_common_transform, get_train_transform, get_train_target_transform, 
     get_valid_common_transform, get_valid_transform, get_valid_target_transform,
-    SegmentationDataset, onehot2maskclass
+    SegmentationDataset#, onehot2maskclass
 )
 from model_p2 import SegmentationWithFCN32#, get_criterion, get_optimizer, get_scheduler
+from model_p2_unet import SegmentationWithUNet
+from model_p2_fcn8 import SegmentationWithFCN8
+from model_p2_fcn16 import SegmentationWithFCN16
 from mean_iou_evaluate import mean_iou_score
+import argparse
 
-def training():
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-a", "--architecture", type=str, choices=['unet', 'vgg-fcn32', 'vgg16bn-fcn32', 'vgg-fcn16', 'vgg-fcn8'])
+
+    args = parser.parse_args()
+    return args
+
+def training(args):
     train_common_transform = get_train_common_transform()
     train_transform = get_train_transform(jitter_param=0.4)
     train_target_transform = get_train_target_transform()
@@ -37,29 +50,41 @@ def training():
         valid_dataset, batch_size=BATCH_SIZE,
         shuffle=False, num_workers=NUM_WORKERS
     )
-
-    vgg16 = torchvision.models.vgg16(pretrained=True)
-    segmentationWithFCN32 = SegmentationWithFCN32(backbone=vgg16.features, num_classes=NUM_CLASSES)
-    segmentationWithFCN32 = segmentationWithFCN32.to(DEVICE)
+    if args.architecture == 'unet':
+        model = SegmentationWithUNet(num_classes=NUM_CLASSES)
+    elif args.architecture == 'vgg-fcn32':
+        vgg16 = torchvision.models.vgg16(pretrained=True)
+        model = SegmentationWithFCN32(backbone=vgg16.features, num_classes=NUM_CLASSES)
+    elif args.architecture == 'vgg16bn-fcn32':
+        vgg16_bn = torchvision.models.vgg16_bn(pretrained=True)
+        model = SegmentationWithFCN32(backbone=vgg16_bn.features, num_classes=NUM_CLASSES)
+    elif args.architecture == 'vgg-fcn16':
+        #vgg16 = torchvision.models.vgg16(pretrained=True)
+        model = SegmentationWithFCN16(num_classes=NUM_CLASSES)
+    elif args.architecture == 'vgg-fcn8':
+        vgg16 = torchvision.models.vgg16(pretrained=True)
+        model = SegmentationWithFCN8(backbone=vgg16.features, num_classes=NUM_CLASSES)
+    model = model.to(DEVICE)
     """
     criterion = get_criterion()
     optimizer = get_optimizer(segmentationWithFCN32)
     lr_scheduler = get_scheduler(optimizer)
     """
     criterion = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.SGD(segmentationWithFCN32.parameters(), lr=LR, momentum=MOMENTUM)
+    optimizer = torch.optim.SGD(model.parameters(), lr=LR, momentum=MOMENTUM)
     lr_scheduler = torch.optim.lr_scheduler.CyclicLR(
         optimizer,base_lr=LR,max_lr=1e-2,step_size_up=2000
     )
     for epoch in range(EPOCH):
+        best_iou = -1.0
         for phase in ['train', 'val']:
             if phase == 'train':
                 print('[train]')
-                segmentationWithFCN32.train()
+                model.train()
                 loader = train_loader
             else:
                 print('[valid]')
-                segmentationWithFCN32.eval()
+                model.eval()
                 loader = valid_loader
             running_loss = 0.0
             ### accumulate pred & labels
@@ -70,9 +95,10 @@ def training():
                 batch_imgs, batch_masks = batch_data
                 batch_imgs = batch_imgs.to(DEVICE)
                 batch_masks = batch_masks.to(DEVICE)
-                class_masks = onehot2maskclass(batch_masks)
+                #class_masks = onehot2maskclass(batch_masks)
+                class_masks = batch_masks
                 with torch.set_grad_enabled(phase == 'train'):
-                    output = segmentationWithFCN32(batch_imgs)
+                    output = model(batch_imgs)
                     #print(output.shape)
                     #print(class_masks.shape)
                     ### output [32, 7, 244, 244] class_masks [32, 244, 244]
@@ -100,7 +126,27 @@ def training():
             else:
                 epoch_loss = running_loss / len(valid_dataset)
                 #epoch_acc = running_corrects.double() / len(valid_dataset)
-            print('{} Loss: {:.4f} Mean_IOU: {:.4f}'.format(phase, epoch_loss, mean_iou))
+            print('Epoch:{} {} Loss: {:.4f} Mean_IOU: {:.4f}'.format(epoch, phase, epoch_loss, mean_iou))
+            if phase == 'val' and mean_iou > best_iou:
+                print('Saving model...')
+                best_iou = mean_iou
+                name_iou = str(math.floor(100*best_iou))
+                name = args.architecture
+                torch.save(model.state_dict(), os.path.join(SAVE_DIR, name+'_'+name_iou+'.pkl'))
+                ### remove unnecessary models
+                saved_models = os.listdir(SAVE_DIR)
+                if len(saved_models) > MAX_MODEL_NUM:
+                    min_acc = None
+                    model_to_removed = None
+                    for saved_model in saved_models:
+                        acc = os.path.splitext(saved_model)[0].split('_')[1]
+                        acc = int(acc)
+                        if min_acc is None or acc < min_acc:
+                            min_acc = acc
+                            model_to_removed = saved_model
+                    print('Removing model {}'.format(model_to_removed))
+                    os.remove(os.path.join(SAVE_DIR, model_to_removed))
 
 if __name__ == '__main__':
-    training()
+    args = parse_args()
+    training(args)

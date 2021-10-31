@@ -31,11 +31,14 @@ class SegmentationDataset(Dataset):
         self.transform = transform
         self.second_transform = second_transform
         self.target_transform = target_transform
+        if len(datas) > 0:
+            self.ori_size = Image.open(datas[0][0]).convert('RGB').size
     
     def __getitem__(self, index):
         img_path, mask_path = self.datas[index]
         img = Image.open(img_path).convert('RGB')
         mask = Image.open(mask_path).convert('RGB')
+        
         if self.common_transform is not None:
             #img = self.common_transform(img)
             #mask = self.common_transform(mask)
@@ -47,6 +50,8 @@ class SegmentationDataset(Dataset):
             img = self.second_transform(img)
         if self.target_transform is not None:
             mask = self.target_transform(mask)
+        ### turn onehot [3,244,244] into [244,244]
+        mask = onehot2maskclass(mask)
         return img, mask
 
     def __len__(self):
@@ -102,11 +107,12 @@ def get_train_target_transform():
 def onehot2maskclass(batch_masks):
     ### batch_masks [32, 3, 244, 244]
     #print(batch_masks.shape)
-    class_masks = 4*batch_masks[:, 0, :, :] + 2*batch_masks[:, 1, :, :] + 1*batch_masks[:, 2, :, :]
+    #class_masks = 4*batch_masks[:, 0, :, :] + 2*batch_masks[:, 1, :, :] + 1*batch_masks[:, 2, :, :]
+    class_masks = 4*batch_masks[0, :, :] + 2*batch_masks[1, :, :] + 1*batch_masks[2, :, :]
     #print(class_masks.shape)
     ### should simultaneously change these labels
     ### initialize another one
-    class_masks_copy = torch.zeros_like(class_masks).to(DEVICE)
+    class_masks_copy = torch.zeros_like(class_masks)#.to(DEVICE)
     class_masks_copy[class_masks == 3] = 0  # (Cyan: 011) Urban land 
     class_masks_copy[class_masks == 6] = 1  # (Yellow: 110) Agriculture land 
     class_masks_copy[class_masks == 5] = 2  # (Purple: 101) Rangeland 
@@ -188,5 +194,26 @@ if __name__ == '__main__':
     )
     img, mask = segmentationDataset[57]
     #print(mask[:,345,450])
-    labels = 4*mask[2,:,:]+2*mask[1,:,:]+1*mask[0,:,:]
-    print(labels)
+    #labels = 4*mask[2,:,:]+2*mask[1,:,:]+1*mask[0,:,:]
+    #print(labels)
+    loader = torch.utils.data.DataLoader(
+        segmentationDataset, batch_size=32,
+        shuffle=True, num_workers=4
+    )
+    distri = [0.0 for i in range(7)]
+    for idx, batch_data in enumerate(loader):
+        batch_imgs, batch_masks = batch_data
+        total = batch_masks.shape[0]* batch_masks.shape[1]* batch_masks.shape[2]
+        temp = 0
+        for i in range(7):
+            distri[i] += (batch_masks == i).sum()
+            temp += (batch_masks == i).sum()
+        assert total==temp
+        if idx % 20 == 0:
+            print(distri)
+    print(distri)
+    overall = sum([a.item() for a in distri])
+    ratio = [overall / a for a in distri]
+    print(ratio)
+    adjust_ratio = [r / min(ratio) for r in ratio]
+    print(adjust_ratio)
