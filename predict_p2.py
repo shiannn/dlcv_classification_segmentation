@@ -14,6 +14,7 @@ from dataset_p2 import (
 )
 from mean_iou_evaluate import mean_iou_score
 
+### The script is totally for testing, which has no groundtruth in the folder of images
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("-i", "--input_path", type=str, help="input path for predicting")
@@ -31,14 +32,15 @@ def predicting(args):
         args.input_path, 
         common_transform=valid_common_transform, 
         transform = valid_transform,
-        target_transform=valid_target_transform
+        target_transform=valid_target_transform,
+        is_test=True
     )
     valid_loader = torch.utils.data.DataLoader(
         valid_dataset, batch_size=BATCH_SIZE,
         shuffle=False, num_workers=NUM_WORKERS
     )
     fcn16_1 = SegmentationWithFCN16(num_classes=NUM_CLASSES)
-    fcn16_1.load_state_dict(torch.load(os.path.join('model_dict_p2_fcn16', 'vgg-fcn16_64.pkl')))
+    fcn16_1.load_state_dict(torch.load(os.path.join(SAVE_DIR, 'vgg-fcn16_64.pkl')))
     fcn16_1.eval()
     fcn16_1 = fcn16_1.to(DEVICE)
     vgg16 = torchvision.models.vgg16()
@@ -49,25 +51,17 @@ def predicting(args):
 
     vgg16_bn = torchvision.models.vgg16_bn()
     vgg16bn_fcn32 = SegmentationWithFCN32(backbone=vgg16_bn.features, num_classes=NUM_CLASSES)
-    vgg16bn_fcn32.load_state_dict(torch.load(os.path.join('model_dict_p2', 'vgg16bn-fcn32_65.pkl')))
+    vgg16bn_fcn32.load_state_dict(torch.load(os.path.join(SAVE_DIR, 'vgg16bn-fcn32_65.pkl')))
     vgg16bn_fcn32.eval()
     vgg16bn_fcn32 = vgg16bn_fcn32.to(DEVICE)
-    """
-    fcn16_2 = SegmentationWithFCN16(num_classes=NUM_CLASSES)
-    fcn16_2.load_state_dict(torch.load(os.path.join(SAVE_DIR, 'vgg-fcn16_63.pkl')))
-    fcn16_2.eval()
-    fcn16_2 = fcn16_2.to(DEVICE)
-    """
+    
     preds = None
-    labels = None
     ori_height, ori_width = valid_dataset.ori_size
     with torch.no_grad():
         for idx, batch_data in enumerate(valid_loader):
-            batch_imgs, batch_masks = batch_data
+            batch_imgs = batch_data
             
             batch_imgs = batch_imgs.to(DEVICE)
-            batch_masks = batch_masks.to(DEVICE)
-            class_masks = batch_masks
             outputs = []
             for model in [fcn16_1, fcn32, vgg16bn_fcn32]:
                 output = model(batch_imgs)
@@ -79,23 +73,17 @@ def predicting(args):
             ### pred, class_masks are BATCH_SIZE,224,224
             ### According the mean_iou_evaluate.py, test_data should be 512,512
             pred = pred.unsqueeze(1)
-            class_masks = class_masks.unsqueeze(1)
             resized_pred = F.interpolate(
                 pred.float(), size=(ori_height, ori_width)
             )
-            resized_class_masks = F.interpolate(
-                class_masks.float(), size=(ori_height, ori_width)
-            )
             
             preds = resized_pred.cpu().numpy() if preds is None else np.concatenate((preds, resized_pred.cpu().numpy()), axis=0)
-            labels = resized_class_masks.cpu().numpy() if labels is None else np.concatenate((labels, resized_class_masks.cpu().numpy()), axis=0)
         ### preds, labels are IMAGE_NUM,1,224,224
         preds = np.squeeze(preds)
-        labels = np.squeeze(labels)
         ret_onehot = maskclass2onehot(preds)
         ### ret_onehot are [IMAGE_NUM, 512, 512, 3]
         for i in range(ret_onehot.shape[0]):
-            source_path, _ = valid_dataset.datas[i]
+            source_path = valid_dataset.datas[i]
             save_name = os.path.basename(source_path)
             save_path = os.path.join(args.output_path, save_name)
             print(save_path)

@@ -7,8 +7,8 @@ DATAROOT = os.path.join(HW1_ROOT, 'p2_data')
 TRAIN_ROOT = os.path.join(DATAROOT, 'train')
 VAL_ROOT = os.path.join(DATAROOT, 'validation')
 
-#SAVE_DIR = os.path.join(BASE_DIR, 'model_dict_p2')
-SAVE_DIR = os.path.join('/', os.path.join(os.path.join(os.path.join('tmp2', 'aislab'), 'hungjui'), 'model_dict_p2'))
+SAVE_DIR = os.path.join(BASE_DIR, 'model_dict_p2_download')
+#SAVE_DIR = os.path.join('/', os.path.join(os.path.join(os.path.join('tmp2', 'aislab'), 'hungjui'), 'model_dict_p2'))
 os.makedirs(SAVE_DIR, exist_ok=True)
 
 IMAGE_SIZE = 224

@@ -9,51 +9,71 @@ import torchvision.transforms as transforms
 
 class SegmentationDataset(Dataset):
     def __init__(self, root_dir, common_transform=None, 
-    transform=None, second_transform=None, target_transform=None):
+    transform=None, second_transform=None, target_transform=None, is_test=False):
+        self.is_test = is_test
         self.root_dir = root_dir
         datas = []
-        sats, masks = [],[]
-        for img_name in sorted(os.listdir(self.root_dir)):
-            img_name_nosuffix = os.path.splitext(img_name)[0]
-            img_id, sat_mask = img_name_nosuffix.split('_')
-            if sat_mask == 'sat':
-                sats.append(img_name)
-            elif sat_mask == 'mask':
-                masks.append(img_name)
-        for sat, mask in zip(sats, masks):
-            sat_id, sat_attach = os.path.splitext(sat)[0].split('_')
-            mask_id, mask_attach = os.path.splitext(mask)[0].split('_')
-            assert sat_id == mask_id and sat_attach == 'sat' and mask_attach == 'mask'
-            sat_abs = os.path.join(self.root_dir, sat)
-            mask_abs = os.path.join(self.root_dir, mask)
-            datas.append((sat_abs, mask_abs))
+        if is_test:
+            ### All the images in root_dir are test images
+            for img_name in sorted(os.listdir(self.root_dir)):
+                sat_abs = os.path.join(self.root_dir, img_name)
+                datas.append(sat_abs)
+        else:
+            sats, masks = [],[]
+            for img_name in sorted(os.listdir(self.root_dir)):
+                img_name_nosuffix = os.path.splitext(img_name)[0]
+                img_id, sat_mask = img_name_nosuffix.split('_')
+                if sat_mask == 'sat':
+                    sats.append(img_name)
+                elif sat_mask == 'mask':
+                    masks.append(img_name)
+            for sat, mask in zip(sats, masks):
+                sat_id, sat_attach = os.path.splitext(sat)[0].split('_')
+                mask_id, mask_attach = os.path.splitext(mask)[0].split('_')
+                assert sat_id == mask_id and sat_attach == 'sat' and mask_attach == 'mask'
+                sat_abs = os.path.join(self.root_dir, sat)
+                mask_abs = os.path.join(self.root_dir, mask)
+                datas.append((sat_abs, mask_abs))
         self.datas = datas
         self.common_transform = common_transform
         self.transform = transform
         self.second_transform = second_transform
         self.target_transform = target_transform
         if len(datas) > 0:
-            self.ori_size = Image.open(datas[0][0]).convert('RGB').size
+            first_img = datas[0] if self.is_test else datas[0][0]
+            self.ori_size = Image.open(first_img).convert('RGB').size
+        else:
+            self.ori_size = 244
     
     def __getitem__(self, index):
-        img_path, mask_path = self.datas[index]
+        if self.is_test:
+            img_path = self.datas[index]
+        else:
+            img_path, mask_path = self.datas[index]
+            mask = Image.open(mask_path).convert('RGB')
         img = Image.open(img_path).convert('RGB')
-        mask = Image.open(mask_path).convert('RGB')
         
         if self.common_transform is not None:
             #img = self.common_transform(img)
             #mask = self.common_transform(mask)
-            img, mask = self.common_transform(img, mask)
+            if self.is_test:
+                img = self.common_transform(img)
+            else:
+                img, mask = self.common_transform(img, mask)
         if self.transform is not None:
             img = self.transform(img)
         ### for other methods
         if self.second_transform is not None:
             img = self.second_transform(img)
         if self.target_transform is not None:
-            mask = self.target_transform(mask)
+            if not self.is_test:
+                mask = self.target_transform(mask)
         ### turn onehot [3,244,244] into [244,244]
-        mask = onehot2maskclass(mask)
-        return img, mask
+        if self.is_test:
+            return img
+        else:
+            mask = onehot2maskclass(mask)
+            return img, mask
 
     def __len__(self):
         return len(self.datas)
@@ -186,10 +206,13 @@ def get_valid_common_transform():
     ])
     return transform
     """
-    def common_transform(img, mask, degree=15):
+    def common_transform(img, mask=None, degree=15):
         img = torchvision.transforms.functional.resize(img, size=IMAGE_SIZE)
-        mask = torchvision.transforms.functional.resize(mask, size=IMAGE_SIZE)
-        return img, mask
+        if mask is not None:
+            mask = torchvision.transforms.functional.resize(mask, size=IMAGE_SIZE)
+            return img, mask
+        else:
+            return img
     return common_transform
 
 def get_valid_transform(jitter_param=0.4):
