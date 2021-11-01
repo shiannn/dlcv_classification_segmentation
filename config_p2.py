@@ -10,7 +10,7 @@ VAL_ROOT = os.path.join(DATAROOT, 'validation')
 IS_SAVE = False
 SAVE_DIR = os.path.join(BASE_DIR, 'model_dict_p2_download')
 #SAVE_DIR = os.path.join('/', os.path.join(os.path.join(os.path.join('tmp2', 'aislab'), 'hungjui'), 'model_dict_p2'))
-os.makedirs(SAVE_DIR, exist_ok=True)
+#os.makedirs(SAVE_DIR, exist_ok=True)
 
 IMAGE_SIZE = 224
 NUM_CLASSES = 7
@@ -25,7 +25,7 @@ WEIGHT = None
 
 SCHEDULER_STEPSIZE = 7
 SCHEDULER_GAMMA = 0.1
-os.environ['CUDA_VISIBLE_DEVICES'] = '6'
+#os.environ['CUDA_VISIBLE_DEVICES'] = '6'
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 MAX_MODEL_NUM = 4
 if __name__ == '__main__':
