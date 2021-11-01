@@ -20,5 +20,5 @@ MOMENTUM = 0.9
 
 SCHEDULER_STEPSIZE = 7
 SCHEDULER_GAMMA = 0.1
-os.environ['CUDA_VISIBLE_DEVICES'] = '3'
+os.environ['CUDA_VISIBLE_DEVICES'] = '7'
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")

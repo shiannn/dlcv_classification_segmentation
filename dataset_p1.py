@@ -5,28 +5,39 @@ from PIL import Image
 import torchvision.transforms as transforms
 
 class ClassificationDataset(Dataset):
-    def __init__(self, root_dir, transform=None, second_transform=None, target_transform=None):
+    def __init__(self, root_dir, transform=None, second_transform=None, target_transform=None, is_test=False):
+        self.is_test = is_test
         self.root_dir = root_dir
         datas = []
         for img_name in os.listdir(self.root_dir):
-            img_name_nosuffix = os.path.splitext(img_name)[0]
-            class_label, image_id = img_name_nosuffix.split('_')
-            class_label = int(class_label)
-            img_name_abs = os.path.join(self.root_dir, img_name)
-            datas.append((img_name_abs, class_label))
+            if self.is_test:
+                img_name_abs = os.path.join(self.root_dir, img_name)
+                datas.append(img_name_abs)
+            else:
+                img_name_nosuffix = os.path.splitext(img_name)[0]
+                class_label, image_id = img_name_nosuffix.split('_')
+                class_label = int(class_label)
+                img_name_abs = os.path.join(self.root_dir, img_name)
+                datas.append((img_name_abs, class_label))
         self.datas = datas
         self.transform = transform
         self.second_transform = second_transform
         self.target_transform = target_transform
     
     def __getitem__(self, index):
-        img_path, label = self.datas[index]
+        if self.is_test:
+            img_path = self.datas[index]
+        else:
+            img_path, label = self.datas[index]
         img = Image.open(img_path).convert('RGB')
         if self.transform is not None:
             img = self.transform(img)
         if self.second_transform is not None:
             img = self.second_transform(img)
-        return img,label
+        if self.is_test:
+            return img
+        else:
+            return img,label
     
     def __len__(self):
         return len(self.datas)
