@@ -84,7 +84,7 @@ def predicting(args):
         ### ret_onehot are [IMAGE_NUM, 512, 512, 3]
         for i in range(ret_onehot.shape[0]):
             source_path = valid_dataset.datas[i]
-            save_name = os.path.basename(source_path)
+            save_name = os.path.splitext(os.path.basename(source_path))[0] + ".png" # always output .png
             save_path = os.path.join(args.output_path, save_name)
             print(save_path)
             img_tosave = Image.fromarray(np.uint8(255* ret_onehot[i]))

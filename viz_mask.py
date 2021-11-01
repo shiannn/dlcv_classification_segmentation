@@ -133,4 +133,6 @@ if __name__ == '__main__':
         ind = np.where(masks==c)
         mask[ind[0], ind[1]] = 1
         img = viz_data(img, mask, color=cmap[c])
-        imageio.imsave('./exp.png', np.uint8(img))
+        seg_dir = os.path.dirname(seg_path)
+        seg_name = os.path.basename(seg_path)
+        imageio.imsave(os.path.join(seg_dir, 'exp_'+seg_name), np.uint8(img))
