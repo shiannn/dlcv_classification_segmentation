@@ -2,7 +2,8 @@ import os
 import torch
 import torchvision
 import pandas as pd
-from config_p1 import EPOCH, BATCH_SIZE, NUM_WORKERS, DEVICE, SAVE_DIR
+import numpy as np
+from config_p1 import EPOCH, BATCH_SIZE, NUM_WORKERS, DEVICE, SAVE_DIR, IS_PLOT
 from dataset_p1 import ClassificationDataset, get_valid_transform
 import argparse
 
@@ -56,20 +57,38 @@ def predicting(args):
     """
 
     preds = None
+    feats_array = None
     #column_names = ["image_id", "label"]
     with torch.no_grad():
         for idx, batch_data in enumerate(valid_loader):
             batch_imgs = batch_data
             batch_imgs = batch_imgs.to(DEVICE)
             outputs = []
+            features = []
             for model in [vgg16_bn, vgg19_bn]:
                 output = model(batch_imgs)
-                #output = torch.nn.functional.softmax(output, dim=1)
                 outputs.append(output)
+                #output = torch.nn.functional.softmax(output, dim=1)
+                ### get features of the second last layer
+                if IS_PLOT:
+                    feats = model.features(batch_imgs)
+                    feats = model.avgpool(feats)
+                    feats = torch.flatten(feats, 1)
+                    feats = model.classifier[0](feats)
+                    feats = model.classifier[1](feats)
+                    ### feats is [32,4096]
+                    features.append(feats)
             outputs = torch.stack(outputs, dim=0)
             outputs = outputs.mean(dim=0)
             _, ensemble_preds = torch.max(outputs, 1)
             preds = ensemble_preds if preds is None else torch.cat((preds, ensemble_preds), axis=0)
+            if IS_PLOT:
+                features = torch.stack(features, dim=0)
+                features = features.mean(dim=0)
+                feats_array = features.cpu().numpy() if feats_array is None else np.concatenate((feats_array, features.cpu().numpy()), axis=0)
+        if IS_PLOT:
+            print('feats_array', feats_array.shape)
+            np.save('features.npy', feats_array)
         preds = preds.cpu().numpy().tolist()
         write_csv = {
             "image_id": [os.path.basename(valid_dataset.datas[i]) for i in range(len(preds))],
