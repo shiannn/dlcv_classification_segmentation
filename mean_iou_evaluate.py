@@ -8,7 +8,7 @@ def read_masks(filepath):
     '''
     Read masks from directory and tranform to categorical
     '''
-    file_list = [file for file in os.listdir(filepath) if file.endswith('.png')]
+    file_list = [file for file in os.listdir(filepath) if file.endswith('.png') or file.endswith('.jpg')]
     file_list.sort()
     n_masks = len(file_list)
     masks = np.empty((n_masks, 512, 512))

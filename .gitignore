@@ -4,3 +4,8 @@
 hw1_data/*
 *png
 *jpg
+*.csv
+
+*npy
+*.pkl
+__pycache__/
