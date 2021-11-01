@@ -7,7 +7,7 @@ DATAROOT = os.path.join(HW1_ROOT, 'p1_data')
 TRAIN_ROOT = os.path.join(DATAROOT, 'train_50')
 VAL_ROOT = os.path.join(DATAROOT, 'val_50')
 
-SAVE_DIR = os.path.join(BASE_DIR, 'model_dict_p1')
+SAVE_DIR = os.path.join(BASE_DIR, 'model_dict_p1_download')
 os.makedirs(SAVE_DIR, exist_ok=True)
 
 #print(TRAIN_ROOT, VAL_ROOT)
