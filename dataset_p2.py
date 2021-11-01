@@ -12,6 +12,7 @@ class SegmentationDataset(Dataset):
     transform=None, second_transform=None, target_transform=None, is_test=False):
         self.is_test = is_test
         self.root_dir = root_dir
+        to_plot = []
         datas = []
         if is_test:
             ### All the images in root_dir are test images
@@ -34,7 +35,10 @@ class SegmentationDataset(Dataset):
                 sat_abs = os.path.join(self.root_dir, sat)
                 mask_abs = os.path.join(self.root_dir, mask)
                 datas.append((sat_abs, mask_abs))
+                if sat in ['0010_sat.jpg', '0097_sat.jpg', '0107_sat.jpg']:
+                    to_plot.append(sat_abs)
         self.datas = datas
+        self.to_plot = to_plot
         self.common_transform = common_transform
         self.transform = transform
         self.second_transform = second_transform
@@ -231,12 +235,22 @@ def get_valid_target_transform():
     return transform
 
 if __name__ == '__main__':
+    train_common_transform = get_train_common_transform()
+    train_transform = get_train_transform(jitter_param=0.4)
+    train_target_transform = get_train_target_transform()
+    segmentationDataset = SegmentationDataset(
+        TRAIN_ROOT, 
+        common_transform=train_common_transform, 
+        transform = train_transform,
+        target_transform=train_target_transform
+    )
+    print(segmentationDataset.to_plot)
+    """
     mock_preds = np.load('mock_preds.npy')
     onehot_mask = maskclass2onehot(mock_preds)
     print(onehot_mask.shape)
     print(onehot_mask.max())
     print(onehot_mask.min())
-    """
     print(mock_preds[0,0,0])
     print(onehot_mask[0,0,0,:])
     print(mock_preds[10,20,30])

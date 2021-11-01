@@ -3,11 +3,15 @@ import math
 import torch
 import torchvision
 import numpy as np
-from config_p2 import TRAIN_ROOT, VAL_ROOT, BATCH_SIZE, EPOCH, NUM_WORKERS, DEVICE, NUM_CLASSES, LR, MOMENTUM, WEIGHT, SAVE_DIR, MAX_MODEL_NUM
+from PIL import Image
+from config_p2 import (
+    TRAIN_ROOT, VAL_ROOT, BATCH_SIZE, EPOCH, NUM_WORKERS, DEVICE, NUM_CLASSES, 
+    LR, MOMENTUM, WEIGHT, SAVE_DIR, MAX_MODEL_NUM, IS_SAVE
+)
 from dataset_p2 import (
     get_train_common_transform, get_train_transform, get_train_target_transform, 
     get_valid_common_transform, get_valid_transform, get_valid_target_transform,
-    SegmentationDataset#, onehot2maskclass
+    SegmentationDataset, maskclass2onehot
 )
 from model_p2 import SegmentationWithFCN32#, get_criterion, get_optimizer, get_scheduler
 from model_p2_unet import SegmentationWithUNet
@@ -116,6 +120,27 @@ def training(args):
                 preds = pred.cpu().numpy() if preds is None else np.concatenate((preds, pred.cpu().numpy()), axis=0)
                 labels = class_masks.cpu().numpy() if labels is None else np.concatenate((labels, class_masks.cpu().numpy()), axis=0)
                 
+            ### plotting assigned images
+            if epoch in [20, 40, 50] and phase == 'val':
+                for to_plot in valid_dataset.to_plot:
+                    to_plot_img = Image.open(to_plot).convert('RGB')
+                    to_plot_img = valid_dataset.common_transform(to_plot_img)
+                    to_plot_img = valid_dataset.transform(to_plot_img)
+                    #print('to_plot_img.shape', to_plot_img.shape)
+                    to_plot_img = to_plot_img.unsqueeze(0).to(DEVICE)
+                    to_plot_output = model(to_plot_img)
+                    _, to_plot_pred = torch.max(to_plot_output, 1)
+                    to_plot_pred = to_plot_pred.unsqueeze(1)
+                    to_plot_pred = torch.nn.functional.interpolate(
+                        to_plot_pred.float(), size=(512, 512)
+                    )
+                    #print('to_plot_pred.shape', to_plot_pred.shape)
+                    to_plot_pred = to_plot_pred.squeeze(1)
+                    to_plot_img_array = to_plot_pred.cpu().numpy()
+                    ret_onehot = maskclass2onehot(to_plot_img_array)
+                    to_plot_save = Image.fromarray(np.uint8(255* ret_onehot.squeeze()))
+                    to_plot_save.save('{}_{}'.format(epoch, os.path.basename(to_plot)))
+                    #print('ret_onehot.shape', ret_onehot.shape)
                 
             mean_iou = mean_iou_score(preds, labels)
             if phase == 'train':
@@ -127,7 +152,7 @@ def training(args):
                 epoch_loss = running_loss / len(valid_dataset)
                 #epoch_acc = running_corrects.double() / len(valid_dataset)
             print('Epoch:{} {} Loss: {:.4f} Mean_IOU: {:.4f}'.format(epoch, phase, epoch_loss, mean_iou))
-            if phase == 'val' and mean_iou > best_iou:
+            if IS_SAVE and phase == 'val' and mean_iou > best_iou:
                 print('Saving model...')
                 best_iou = mean_iou
                 name_iou = str(math.floor(100*best_iou))
